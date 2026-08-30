@@ -1,0 +1,19 @@
+# Mapping from logical PRB-construction LLMs (Appendix F, Table 8) to the
+# concrete provider+model pair used by ``mind_v2.mind.utils.llm_client``.
+construction_llms:
+  kimi_k2:
+    provider: openrouter
+    model: moonshotai/kimi-k2
+  deepseek_v32:
+    provider: deepseek
+    model: deepseek-chat
+  glm_47:
+    provider: openrouter
+    model: zai-org/glm-4-7-airx
+faithfulness_judges:
+  primary:
+    provider: deepseek
+    model: deepseek-chat
+  cross_judge:
+    provider: openrouter
+    model: openai/gpt-4o

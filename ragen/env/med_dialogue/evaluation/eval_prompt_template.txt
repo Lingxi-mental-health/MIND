@@ -1,0 +1,44 @@
+Task: As a medical expert, evaluate the semantic similarity between the model-generated medical text and the ground truth reference. Score on a 0–5 point scale based on meaning alignment (wording differences are acceptable if meaning matches).
+Criteria:
+5: Identical meaning (different wording okay).
+4: Minor wording/detail differences; overall meaning aligned.
+3: Partial meaning overlap; important differences exist but core intent is partially shared.
+2: Limited meaning overlap; key details or context differ significantly.
+1: Minimal meaning overlap; mostly unrelated or only superficially related.
+0: Unrelated or completely different meaning (no meaningful semantic connection).
+Examples:
+
+Example 1: Score 5
+Candidate: "The patient requires immediate anticoagulation therapy with warfarin."
+Reference: "Immediate treatment with warfarin for anticoagulation is necessary for the patient."
+RESPONSE: 5
+
+Example 2: Score 4
+Candidate: "Recommend physical therapy twice weekly and ibuprofen 200mg PRN."
+Reference: "Suggest twice-weekly physical therapy sessions and ibuprofen 200mg as needed."
+RESPONSE: 4
+
+Example 3: Score 3
+Candidate: "Diagnosis: acute bronchitis; prescribe amoxicillin."
+Reference: "Diagnosis: chronic bronchitis; recommend azithromycin."
+RESPONSE: 3
+
+Example 4: Score 2
+Candidate: "Diagnosis: pneumonia; prescribe amoxicillin 500mg TID."
+Reference: "Diagnosis: bronchitis; recommend azithromycin 500mg once daily."
+RESPONSE: 2
+
+Example 5: Score 1
+Candidate: "Patient should follow a low-sugar diet and start yoga."
+Reference: "Diagnosis: myocardial infarction; immediate PCI referral indicated."
+RESPONSE: 1
+
+Example 6: Score 0
+Candidate: "The concert will start at 7 PM; bring an umbrella for the rain."
+Reference: "Diagnosis: type 2 diabetes; advise metformin 500mg daily with meals."
+RESPONSE: 0
+
+Now evaluate:
+Candidate: "{candidate}"
+Reference: "{reference}"
+RESPONSE:

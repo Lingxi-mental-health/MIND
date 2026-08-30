@@ -1,0 +1,6 @@
+env:
+  name: "frozenlake"
+  data_dir: "data/frozenlake"
+  env_kwargs:
+    size: 4
+    p: 0.8

@@ -1,0 +1,127 @@
+# Trainig paradigm
+rl_or_sft: "rl"
+# System settings
+system:
+  cuda_visible_devices: "0,1,2,3"
+  n_gpus: 4
+  vllm_attention_backend: "XFORMERS"
+  hydra_output_subdir: "outputs/exp_configs/logs/$(date +%Y-%m-%d)/$(date +%H-%M-%S)"
+
+
+# Model settings
+model:
+  # base_model: "/opt/tiger/Qwen2.5-7B-Instruct"
+  base_model: "/opt/tiger/Qwen2.5-3B-Instruct"
+  experiment_name: "ragen-main-exp-medical-consultation"
+  gradient_checkpointing: true
+
+# Training parameters
+training:
+  train_data_num: null
+  val_data_num: 10
+  val_batch_size: 10
+  micro_batch_size: 4
+  train_batch_size: 16
+  ppo_batch_size: 64
+  max_start_length: 512
+  max_response_length: 128
+  max_obs_length: 128
+  max_turns: 5
+  rollout_tp_size: 4
+  n_rollout: 16
+  total_epochs: 5
+  temperature: 0.7
+  use_sft: false
+  no_think_rl: false
+  state_masking: true
+  binary_reward: false
+  mask_state: false
+  length_penalty: false
+  ref_update_steps: null
+  total_training_steps: 200
+
+# Optimization parameters
+optimization:
+  actor_lr: 1e-6
+  critic_lr: 1e-5
+  use_kl_loss: true
+  kl_coef: 0.01
+  kl_type: low_var_kl
+  adv_estimator: gae
+  gpu_memory_utilization: 0.4
+  no_ref_policy: false
+  betas: [0.9,0.95]
+  reward_norm_type: brpo
+
+  vllm_config:
+    disable_sleep_mode: true  # 禁用 sleep mode 以避免多实例冲突
+    enable_chunked_prefill: true
+    max_num_batched_tokens: 8192
+
+# Logging settings
+logging:
+  mode: "['wandb']"
+  log_images: true
+  log_image_dir: "log/trajectory"
+  log_image_step_size: 4
+  log_n_image_per_batch: 32
+
+# Trainer settings
+trainer:
+  val_before_train: true
+  val_only: false
+  default_hdfs_dir: null
+  nnodes: 1
+  save_freq: 200
+  test_freq: 50
+  project_name: "RAGEN"
+
+# SFT settings
+sft:
+  env_type: "sokoban"  # or "frozenlake"
+  output_dir: "outputs/sft"
+
+  # Data generation parameters
+  data_generation:
+    data_dir: "data/sft"
+    algo: "bfs"
+    seed: 100000 # needs to be different from the seed in the RL config
+    train_size: 1000
+    test_size: 100
+    bfs_max_depths: 100
+    prefix: "message"
+    num_processes: 16
+
+  # Training parameters
+  training:
+    num_gpus: 1
+    max_length: 2048
+    learning_rate: 1e-4
+    train_batch_size: 128
+    micro_batch_size: 4
+    experiment_name: "test_sft_lora"
+    logger: "['console','wandb']"
+    epochs: 5
+    hdfs_dir: null
+    validate_before_training: true
+    lora_rank: 64
+    lora_alpha: 32
+    target_modules: "all-linear"
+    enable_gradient_checkpointing: false
+    # base_model: "/opt/tiger/Qwen2.5-7B-Instruct"
+    base_model: "/opt/tiger/Qwen2.5-3B-Instruct"
+    project_name: "RAGEN"
+  
+  # Sokoban-specific settings
+  sokoban:
+    dim_x: 6
+    dim_y: 6
+    num_boxes: 1
+    max_steps: 100
+    search_depth: 30
+  
+  # FrozenLake-specific settings
+  frozenlake:
+    size: 4
+    p: 0.8
+    is_slippery: true

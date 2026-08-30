@@ -1,0 +1,5 @@
+env:
+  name: "bandit"
+  data_dir: "data/bandit"
+  env_kwargs:
+    n_arms: 2

@@ -1,0 +1,77 @@
+env:
+  name: "medical_consultation"
+  use_env_llm: true  # 启用环境LLM
+  train_path: "data/medical_consultation/train_tr1.parquet"  # 替换成你的训练数据路径
+  val_path: "data/medical_consultation/val_tr1.parquet"      # 替换成你的验证数据路径
+  env_kwargs:
+    max_turns: 5
+    max_consecutive_duplicates: 3 
+  env_llm:
+    # If vLLM is not available, use FSDP
+    fsdp_config:
+      fsdp_size: -1  # 使用所有4张GPU
+      model_dtype: "bf16"  # 使用 bfloat16 以提高性能
+      param_offload: false  # 如果GPU内存足够，设为false
+      mixed_precision:
+        param_dtype: "bf16"
+        reduce_dtype: "fp32"
+        buffer_dtype: "fp32"
+      wrap_policy: null  # 使用transformer的wrap策略
+
+    vllm_config:
+      tensor_parallel_size: 4  # 使用所有4张GPU进行张量并行
+      gpu_memory_utilization: 0.3  # 保持较高的GPU内存利用率
+      max_num_batched_tokens: 65536  # 由于序列长度较短，可以增加批处理token数量
+      max_num_seqs: 128  # 增加序列数量
+
+    model:
+      # path: "/opt/tiger/Qwen2.5-7B-Instruct"
+      path: "../models/Qwen2.5-3B-Instruct"
+
+      trust_remote_code: true
+      use_liger: true
+      override_config:
+        max_position_embeddings: 2048  # 调整为实际需要的长度
+        use_flash_attention_2: true
+        use_cache: true
+
+    ulysses_sequence_parallel_size: 1  # 设置为 >1 开启 sequence parallel
+
+    generation:
+      # --- 模型输入长度设定 ---
+      prompt_length: 1664               # left-padded prompt 长度
+      response_length: 128              # 生成最大长度（将用于 sampling_params.max_tokens）
+      max_model_len: 1792               # optional: prompt + response，上限要小于模型最大长度
+
+      # --- 采样参数（用于 SamplingParams） ---
+      temperature: 0.7
+      top_p: 1.0
+      top_k: -1
+      repetition_penalty: 1.0
+      do_sample: true
+      num_beams: 1
+      best_of: 1
+      min_p: 0.0
+      n: 1                               # 每个 prompt 生成几个样本（RLHF 通常为 1）
+
+      # --- vLLM 相关推理行为 ---
+      use_cache: true
+      use_beam_search: false
+      detokenize: false
+      ignore_eos: false
+      free_cache_engine: true
+      # --- 日志/概率输出 ---
+      prompt_logprobs: 0
+      generation_logprobs: 0
+      disable_log_stats: true
+
+      # --- 性能相关参数 ---
+      dtype: bfloat16
+      enforce_eager: true
+      enable_chunked_prefill: true
+      tensor_model_parallel_size: 4
+      gpu_memory_utilization: 0.3
+      max_tokens_per_batch: 4096
+
+      # --- 模型加载方式（vLLM 支持） ---
+      load_format: dummy_dtensor

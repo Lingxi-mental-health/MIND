@@ -1,0 +1,351 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+抽取2000条对话数据脚本：
+基于process_dialog_train.py的逻辑，修改采样策略以生成2000条数据
+"""
+
+import json
+import re
+import random
+from typing import List, Dict, Any
+import pandas as pd
+from pathlib import Path
+import os
+
+# 路径根目录：默认相对本仓库，可用环境变量覆盖，避免把内部基础设施路径写进代码
+DATA_ROOT = os.environ.get("MIND_DATA_ROOT", "data")
+
+
+def load_and_filter_csv(csv_file: str) -> pd.DataFrame:
+    """
+    加载CSV文件并过滤OverallDiagnosis_smhc有值的数据
+    """
+    print(f"开始读取CSV文件: {csv_file}")
+    
+    # 读取CSV文件
+    df = pd.read_csv(csv_file)
+    print(f"原始数据总数: {len(df)}")
+    
+    # 过滤OverallDiagnosis_smhc有值的数据
+    filtered_df = df.dropna(subset=['OverallDiagnosis_smhc'])
+    print(f"过滤后有OverallDiagnosis_smhc值的数据: {len(filtered_df)}")
+    
+    # 显示各诊断类别的数量
+    diagnosis_counts = filtered_df['OverallDiagnosis_smhc'].value_counts()
+    print("各诊断类别数量:")
+    for diagnosis, count in diagnosis_counts.items():
+        print(f"  {diagnosis}: {count}")
+    
+    return filtered_df
+
+def sample_balanced_data_2000(df: pd.DataFrame, target_diagnoses: List[str], total_samples: int = 2000) -> pd.DataFrame:
+    """
+    从每个诊断类别按比例抽取样本，总共2000个样本，确保每个patient_id唯一
+    """
+    print(f"\n开始抽取{total_samples}个样本（确保patient_id唯一）...")
+    
+    # 计算每个诊断类别的可用数据量
+    diagnosis_data_counts = {}
+    for diagnosis in target_diagnoses:
+        diagnosis_data = df[df['OverallDiagnosis_smhc'] == diagnosis]
+        unique_patients = diagnosis_data['patient_id_mdd'].nunique()
+        diagnosis_data_counts[diagnosis] = {
+            'total_records': len(diagnosis_data),
+            'unique_patients': unique_patients
+        }
+        print(f"  {diagnosis}: 总记录数={len(diagnosis_data)}, 唯一患者数={unique_patients}")
+    
+    # 计算总可用患者数
+    total_available_patients = sum(data['unique_patients'] for data in diagnosis_data_counts.values())
+    print(f"总可用唯一患者数: {total_available_patients}")
+    
+    if total_available_patients < total_samples:
+        print(f"警告: 总可用患者数({total_available_patients})少于要求样本数({total_samples})")
+        total_samples = total_available_patients
+    
+    # 按比例分配样本数
+    sampled_data = []
+    remaining_samples = total_samples
+    
+    for i, diagnosis in enumerate(target_diagnoses):
+        data_info = diagnosis_data_counts[diagnosis]
+        unique_patients = data_info['unique_patients']
+        
+        if i == len(target_diagnoses) - 1:
+            # 最后一个类别，分配剩余所有样本
+            samples_for_diagnosis = remaining_samples
+        else:
+            # 按比例分配
+            proportion = unique_patients / total_available_patients
+            samples_for_diagnosis = int(total_samples * proportion)
+            samples_for_diagnosis = min(samples_for_diagnosis, unique_patients, remaining_samples)
+        
+        if samples_for_diagnosis > 0:
+            diagnosis_data = df[df['OverallDiagnosis_smhc'] == diagnosis]
+            
+            # 先按patient_id去重，每个患者随机选择一条记录
+            unique_patient_data = diagnosis_data.groupby('patient_id_mdd').apply(
+                lambda x: x.sample(n=1, random_state=42)
+            ).reset_index(drop=True)
+            
+            # 从唯一患者中随机抽取指定数量
+            sampled = unique_patient_data.sample(n=samples_for_diagnosis, random_state=42)
+            sampled_data.append(sampled)
+            print(f"  {diagnosis}: 抽取了{len(sampled)}个样本")
+            
+            remaining_samples -= len(sampled)
+    
+    # 合并所有抽样数据
+    result_df = pd.concat(sampled_data, ignore_index=True)
+    print(f"总共抽取样本数: {len(result_df)}")
+    print(f"总唯一患者数: {result_df['patient_id_mdd'].nunique()}")
+    
+    return result_df
+
+def parse_dialogue(cleaned_text: str) -> List[Dict[str, str]]:
+    """
+    解析cleaned_text中的对话，提取医生和患者的对话轮次
+    """
+    # 按"未知发言人："分割对话
+    dialogue_parts = cleaned_text.split("未知发言人：")
+    dialogue_parts = [part.strip() for part in dialogue_parts if part.strip()]
+    
+    conversations = []
+    for i, part in enumerate(dialogue_parts):
+        # 医生先说话(偶数索引)，患者回复(奇数索引)
+        if i % 2 == 0:
+            role = "doctor"
+        else:
+            role = "patient"
+            
+        # 清理文本，移除多余的换行和空格
+        content = re.sub(r'\n+', ' ', part).strip()
+        conversations.append({
+            "role": role,
+            "content": content
+        })
+    
+    return conversations
+
+def create_system_prompt() -> str:
+    """
+    创建系统提示词，定义医生的角色和任务
+    """
+    return """你是一名经验丰富的精神科医生，需要通过问诊为患者提供专业的诊断和建议。请仔细倾听患者的描述，通过有针对性的提问收集充分信息，然后给出准确的诊断和合适的治疗建议。
+
+目标：
+1. 通过有效提问获取关键信息，每轮问题应基于前一轮内容进行调整，避免重复类似问题
+2. 全面分析患者病情，提供准确的诊断和合适的治疗建议
+
+规则：
+1. 你只能选择一种回应方式，不能同时提问和给出诊断
+2. 绝对不要重复或询问与之前类似或相同的问题
+
+回应格式：
+<think> [你的思考过程] </think>
+<answer>如果信息不足，请只提一个问题，格式如下：
+问题：(你的问题)
+</answer> | <answer>如果信息充足，请只提供诊断和建议，格式如下：
+诊断：(患者最可能的疾病或症状)
+建议：(相应的治疗方案或建议)
+</answer>"""
+
+def extract_patient_initial_description(conversations: List[Dict[str, str]]) -> str:
+    """
+    提取患者的初始描述 - 统一使用"您好"作为初始描述
+    """
+    return "您好"
+
+def create_multiturn_sft_data(row: pd.Series, conversations: List[Dict[str, str]]) -> List[Dict[str, Any]]:
+    """
+    从单个对话创建多轮SFT训练数据
+    每一轮对话生成一个训练样本
+    """
+    system_prompt = create_system_prompt()
+    sft_samples = []
+    
+    if not conversations:
+        return sft_samples
+    
+    # 获取行数据
+    visit_number = str(row.get('VisitNumber', ''))
+    patient_id_mdd = str(row.get('patient_id_mdd', ''))
+    diagnosis = str(row.get('OverallDiagnosis_smhc', ''))
+    # 尝试获取治疗建议，如果没有则使用空字符串
+    recommendation = str(row.get('TreatmentRecommendation', ''))
+    if pd.isna(recommendation) or recommendation == 'nan':
+        recommendation = ""
+    
+    # 构建渐进式的prompt和response
+    current_prompt = [{"content": system_prompt, "role": "system"}]
+    
+    # 添加初始患者问候作为第一个user输入
+    initial_description = extract_patient_initial_description(conversations)
+    current_prompt.append({
+        "content": f"{initial_description}\n请决定下一步行动：\n总是输出：<think> [你的思考] </think> <answer> [你的回应] </answer> 不要额外文字。严格遵循此格式。",
+        "role": "user"
+    })
+    
+    # 处理每一轮对话
+    turn_index = 0
+    for i in range(0, len(conversations), 2):
+        # 每轮：医生问题 -> 患者回答
+        if i < len(conversations) and conversations[i]["role"] == "doctor":
+            doctor_question = conversations[i]["content"]
+            
+            # 创建训练样本：当前prompt -> 医生回复
+            sft_samples.append({
+                "data_source": "medical_consultation",
+                "prompt": current_prompt.copy(),
+                "response": doctor_question,
+                "reward_model": {
+                    "ground_truth": {
+                        "diagnosis": diagnosis,
+                        "recommendation": recommendation
+                    }
+                },
+                "extra_info": {
+                    "index": turn_index,
+                    "visit_number": visit_number,
+                    "turn": turn_index + 1,
+                    "patient_id_mdd": patient_id_mdd
+                }
+            })
+            
+            # 更新prompt：加入医生问题
+            current_prompt.append({"content": doctor_question, "role": "assistant"})
+            
+            # 如果有患者回答，加入到prompt中
+            if i + 1 < len(conversations) and conversations[i + 1]["role"] == "patient":
+                patient_answer = conversations[i + 1]["content"]
+                current_prompt.append({"content": patient_answer, "role": "user"})
+            
+            turn_index += 1
+    
+    # 如果有诊断和建议，且最后没有诊断，添加一个最终诊断样本
+    if sft_samples and diagnosis and not any("诊断：" in sample["response"] for sample in sft_samples):
+        final_response = f"诊断：{diagnosis}"
+        if recommendation:
+            final_response += f"\n建议：{recommendation}"
+            
+        sft_samples.append({
+            "data_source": "medical_consultation",
+            "prompt": current_prompt.copy(),
+            "response": final_response,
+            "reward_model": {
+                "ground_truth": {
+                    "diagnosis": diagnosis,
+                    "recommendation": recommendation
+                }
+            },
+            "extra_info": {
+                "index": turn_index,
+                "visit_number": visit_number,
+                "turn": turn_index + 1,
+                "patient_id_mdd": patient_id_mdd,
+                "is_final": True
+            }
+        })
+    
+    return sft_samples
+
+def process_dialog_data(df: pd.DataFrame) -> List[Dict[str, Any]]:
+    """
+    处理DataFrame数据，转换为多轮SFT格式
+    """
+    print("\n开始处理对话数据...")
+    
+    all_sft_samples = []
+    
+    for idx, row in df.iterrows():
+        try:
+            cleaned_text = row.get('cleaned_text', '')
+            
+            if pd.isna(cleaned_text) or not cleaned_text:
+                print(f"跳过空对话: {row.get('VisitNumber', '')}")
+                continue
+            
+            # 解析对话
+            conversations = parse_dialogue(cleaned_text)
+            
+            if len(conversations) < 2:
+                print(f"跳过对话轮次不足的数据: {row.get('VisitNumber', '')}")
+                continue
+            
+            # 创建多轮SFT数据
+            sft_samples = create_multiturn_sft_data(row, conversations)
+            all_sft_samples.extend(sft_samples)
+            
+            if (idx + 1) % 50 == 0:
+                print(f"已处理对话: {idx + 1}/{len(df)}, 生成样本: {len(all_sft_samples)}")
+                
+        except Exception as e:
+            print(f"处理数据时出错 {row.get('VisitNumber', '')}: {str(e)}")
+            continue
+    
+    print(f"转换完成，共生成 {len(all_sft_samples)} 条SFT格式数据")
+    return all_sft_samples
+
+def main():
+    """主函数"""
+    # 文件路径
+    csv_file = os.path.join(DATA_ROOT, "storehouse/dialog_train.csv")
+    output_json = os.path.join(DATA_ROOT, "dialog_2000_filtered_data.json")
+    output_sft_json = os.path.join(DATA_ROOT, "dialog_2000_sft_multiturn_data.json")
+    
+    # 目标诊断类别
+    target_diagnoses = ['Anxiety', 'Depression', 'Mix', 'Other']
+    total_samples = 2000
+    
+    # 确保输出目录存在
+    Path(output_json).parent.mkdir(parents=True, exist_ok=True)
+    
+    # 第一步：加载和过滤CSV数据
+    print("=== 第一步：加载和过滤CSV数据 ===")
+    df = load_and_filter_csv(csv_file)
+    
+    # 第二步：平衡抽样2000个样本
+    print(f"\n=== 第二步：平衡抽样{total_samples}个样本 ===")
+    sampled_df = sample_balanced_data_2000(df, target_diagnoses, total_samples)
+    
+    # 保存过滤后的JSON数据
+    print(f"\n保存过滤后的数据到: {output_json}")
+    sampled_df.to_json(output_json, orient='records', force_ascii=False, indent=2)
+    
+    # 第三步：转换为SFT格式
+    print("\n=== 第三步：转换为多轮SFT格式 ===")
+    sft_data = process_dialog_data(sampled_df)
+    
+    # 保存SFT数据
+    print(f"\n保存SFT数据到: {output_sft_json}")
+    with open(output_sft_json, 'w', encoding='utf-8') as f:
+        json.dump(sft_data, f, ensure_ascii=False, indent=2)
+    
+    # 显示样本统计
+    if sft_data:
+        print("\n=== 样本统计 ===")
+        print(f"总样本数: {len(sft_data)}")
+        
+        # 按诊断类别统计
+        diagnosis_stats = {}
+        for sample in sft_data:
+            diagnosis = sample['reward_model']['ground_truth']['diagnosis']
+            diagnosis_stats[diagnosis] = diagnosis_stats.get(diagnosis, 0) + 1
+        
+        print("按诊断类别统计:")
+        for diagnosis, count in diagnosis_stats.items():
+            print(f"  {diagnosis}: {count}")
+        
+        # 显示第一个样本
+        print("\n=== 样本展示 ===")
+        sample = sft_data[0]
+        print(f"Visit Number: {sample['extra_info']['visit_number']}")
+        print(f"Patient ID MDD: {sample['extra_info']['patient_id_mdd']}")
+        print(f"Turn: {sample['extra_info']['turn']}")
+        print(f"Prompt length: {len(sample['prompt'])}")
+        print(f"Response: {sample['response'][:150]}...")
+        print(f"Diagnosis: {sample['reward_model']['ground_truth']['diagnosis']}")
+
+if __name__ == "__main__":
+    main()

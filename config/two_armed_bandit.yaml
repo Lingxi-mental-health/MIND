@@ -1,0 +1,8 @@
+env:
+  name: "two_armed_bandit"
+  data_dir: "data/two_armed_bandit"
+  env_kwargs:
+    low_risk_name: "phoenix"
+    high_risk_name: "dragon"
+    low_risk_val_name: null
+    high_risk_val_name: null

@@ -1,0 +1,23 @@
+# SFT warm-start configuration (Table 11 of acl_latex.tex).
+# Used by mind_v2/scripts/training/train_sft.sh.
+backbone: Qwen3
+training_method: lora
+lora:
+  rank: 64
+  alpha: 32
+  target_modules: all-linear
+optimizer:
+  learning_rate: 1.0e-4
+  warmup_ratio: 0.03
+  weight_decay: 0.0
+batch:
+  effective: 128          # gradient accumulation across 8 GPUs
+  per_device: 2
+  grad_accum_steps: 8
+schedule:
+  epochs: 3
+  max_seq_length: 4096
+  grad_clip: 1.0
+data:
+  prompt_format: two_stage  # Stage I (<rag_query>) + Stage II (<think><answer>)
+  source: prb_distilled

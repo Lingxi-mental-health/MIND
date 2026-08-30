@@ -1,0 +1,40 @@
+<|im_start|>user\nYou are an AI tasked with evaluating the information-gathering capabilities of a medical consultation AI (Doctor Model). You will be provided with two pieces of text:
+
+1.  **`PATIENT_SELF_REPORT`:** This text is considered the comprehensive account of the patient's symptoms, history, and relevant context as provided by the patient.
+2.  **`DOCTOR_MODEL_GATHERED_INFO`:** This text contains information elicited by the Doctor Model through questioning the patient.
+
+**Your Goal:**
+
+Assess how effectively the Doctor Model's questioning (as reflected in `DOCTOR_MODEL_GATHERED_INFO`) managed to capture the crucial details present in the `PATIENT_SELF_REPORT`. The focus is on the *completeness and accuracy of elicited factual information (symptoms, patient feelings, relevant history)*, not on the diagnostic conclusions or advice that might appear in `PATIENT_SELF_REPORT`.
+
+**Input Texts:**
+
+**`PATIENT_SELF_REPORT`:**
+{patient_self_report}
+**`DOCTOR_MODEL_GATHERED_INFO`:**
+{doctor_gathered_info}
+
+**Output Format Instructions:**
+
+Your entire response MUST be enclosed within `<think></think><answer></answer>` tags.
+
+* **Inside the `<think>` tags:** Perform the detailed analysis. This should include:
+    1.  **Identify Key Patient-Reported Information in `PATIENT_SELF_REPORT`:**
+        * List all distinct symptoms, feelings, timeline details, and relevant contextual information (e.g., changes in eating habits, stressors) described by the patient in `PATIENT_SELF_REPORT`.
+        * *Exclude* any diagnostic statements (e.g., "it appears he is experiencing constipation") or general advice present in `PATIENT_SELF_REPORT` unless it's a direct quote of what the patient felt or was told.
+    2.  **Compare with `DOCTOR_MODEL_GATHERED_INFO`:**
+        * For each piece of key information identified in step 1, determine if it was successfully captured in `DOCTOR_MODEL_GATHERED_INFO`.
+        * Note any key patient-reported information from `PATIENT_SELF_REPORT` that is **missing** from `DOCTOR_MODEL_GATHERED_INFO`.
+        * Note any information present in `DOCTOR_MODEL_GATHERED_INFO` that is **not substantiated by or contradicts** the patient-reported facts in `PATIENT_SELF_REPORT`. (e.g., "No, I did not eat any unusual or hard-to-digest foods" in S1 is new information not explicitly in S2, likely from a direct question. This is acceptable, note it as elicited information not present in the initial self-report).
+    3.  **Assess Questioning Effectiveness:**
+        * Based on the comparison, particularly the *missing crucial information*, evaluate the likely thoroughness and targeted nature of the Doctor Model's questioning. For example, did it seem to ask follow-up questions to explore important changes or details?
+
+* **Inside the `<answer>` tags:** Provide the final score. This should include:
+    1.  **Score:** Assign a score from 0 to 5 for the Doctor Model's questioning ability, where 0 is "Very Poor (missed most crucial information)" and 5 is "Excellent (captured all crucial patient-reported information comprehensively)."
+
+**Example of how to think about a missing piece (for your internal processing within the `<think>` tag):**
+If `PATIENT_SELF_REPORT` mentions "transitioning from not being able to eat to suddenly eating a lot recently" and `DOCTOR_MODEL_GATHERED_INFO` does not contain this, it's a significant missed piece of information that good questioning might have uncovered (e.g., by asking "Have there been any changes to your appetite or how much you're eating?").
+
+<|im_end|>
+<|im_start|>assistant
+<think>

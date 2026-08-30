@@ -1,0 +1,6 @@
+env:
+  name: "countdown"
+  data_dir: "data/countdown"
+  env_kwargs:
+    train_path: "data/countdown/train.parquet"
+    val_path: "data/countdown/test.parquet"

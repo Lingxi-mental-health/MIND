@@ -1,0 +1,39 @@
+# GRPO RL configuration (Table 12 of acl_latex.tex).
+# Used by mind_v2/scripts/training/train_grpo.sh.
+algorithm: grpo
+compute:
+  gpus: 8                 # 8x NVIDIA A100
+optimization:
+  actor_lr: 5.0e-6
+  kl_coef: 0.02
+  clip_low: 0.10          # ε ∈ [0.10, 0.18]
+  clip_high: 0.18
+  entropy_coef: 1.0e-4
+  grad_clip: 1.0
+rollout:
+  backend: vllm
+  temperature: 1.0
+  top_p: 1.0
+  generations_per_prompt: 4
+schedule:
+  policy_updates: 1500    # paper reports 1k–2k
+  episodes_per_update: 128
+  minibatch_size: 64
+  micro_batch_per_gpu: 1
+  ppo_epochs_per_update: 1
+sequence:
+  max_prompt_length: 4096
+  max_response_length: 1024
+turn_budget:
+  max_turns: 10           # L = 10
+reward_weights:
+  terminal: 5.0           # 1[ d_p == d* ] * 5.0
+  info_gain: 0.005        # 0.005 per resolved missing-check field
+  process: 0.01           # rubric average over sym/diff/dec
+  format: 0.1             # malformed / repetition / budget / unsafe
+prb:
+  reliability_threshold: 0.2
+  top_k: 4
+patient_simulator:
+  default_mode: psysim_std
+  alt_mode: psysim_adapt

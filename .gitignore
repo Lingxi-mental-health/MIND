@@ -1,0 +1,63 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+.installed.cfg
+
+# Virtual environments (anchored: config/env and ragen/env are source dirs)
+/.venv/
+/venv/
+/ENV/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Testing / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# Model weights & checkpoints
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*.bin
+*.h5
+checkpoints/
+outputs/
+
+# Experiment tracking & logs
+wandb/
+runs/
+logs/
+*.log
+tensorboard/
+mlruns/
+
+# Data (keep small tracked files explicitly with git add -f)
+*.jsonl.gz
+*.parquet
+*.arrow
+
+# Secrets
+.env
+.env.*
+*.pem
+*.key
+credentials.json
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp

@@ -1,0 +1,22 @@
+<|im_start|>user\nTask: As a medical expert, evaluate the semantic similarity between the model-generated medical text and the ground truth reference. 
+Score on a 0–5 point scale based on meaning alignment (wording differences are acceptable if meaning matches).
+
+Criteria:
+5: Identical meaning (different wording okay).
+4: Minor wording/detail differences; overall meaning aligned.
+3: Partial meaning overlap; important differences exist but core intent is partially shared.
+2: Limited meaning overlap; key details or context differ significantly.
+1: Minimal meaning overlap; mostly unrelated or only superficially related.
+0: Unrelated or completely different meaning (no meaningful semantic connection).
+
+Now evaluate:
+Models' Prediction: "{candidate}"
+Ground-truth: "{reference}"
+
+OUTPUT FORMAT: <answer> [Your Score (0-5)] </answer>
+
+Example output: <answer>3</answer>
+
+<|im_end|>
+<|im_start|>assistant
+<answer>

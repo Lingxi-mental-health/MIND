@@ -1,0 +1,16 @@
+# Inference / patient-agent configuration (Table 13 of acl_latex.tex).
+doctor_agent:
+  sampling_temperature: 1.0
+  top_p: 1.0
+  max_response_length: 2048
+  reliability_threshold: 0.2  # τ_rel
+  top_k: 4
+patient_simulator:
+  backbone: Qwen3            # fixed-weight reference patient
+  temperature: 0.0
+  max_interaction_turns: 10  # L
+  max_response_length: 512
+rectification:
+  self_retry_per_turn: 1
+  fallback_per_episode: 2
+  total_per_episode: 3
